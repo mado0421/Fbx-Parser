@@ -396,7 +396,7 @@ void ExportAnimation(const char* fileName) {
     for (int i = 0; i < nBones; i++) nKeys[i] = g_vecBones[i].keytimes.size();
 
     out.write((char*)&nBones, sizeof(int));
-    out.write((char*)&nKeys, sizeof(int) * nBones);
+    out.write((char*)nKeys, sizeof(int) * nBones);
 
     for (int iBones = 0; iBones < nBones; iBones++) {
         int nTotalFloat = 7 + 8 * nKeys[iBones];
@@ -408,7 +408,7 @@ void ExportAnimation(const char* fileName) {
         GetGlobalMtx(g_vecBones[iBones].globalMatrix, pDest, i);
         for (int iKeys = 0; iKeys < nKeys[iBones]; iKeys++) GetKeyTransform(g_vecBones[iBones].transforms[iKeys], keytimes[iKeys], pDest, i);
 
-        out.write((char*)&pDest, sizeof(float) * nTotalFloat);
+        out.write((char*)pDest, sizeof(float) * nTotalFloat);
     }
 
     out.close();
