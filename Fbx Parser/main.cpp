@@ -14,6 +14,13 @@
 #define IOS_REF (*(pManager->GetIOSettings()))
 #endif
 
+//#define REFLECT
+#ifdef REFLECT
+
+#else
+
+#endif
+
 using namespace DirectX;
 using namespace std;
 
@@ -400,8 +407,6 @@ void GetBoneHierarchy(FbxNode* rootNode) {
 void GetBoneBindpose(FbxScene* scene) {
     int nPose = scene->GetPoseCount();
 
-    cout << "<BindPose>\n";
-
     for (int iPose = 0; iPose < nPose; iPose++) {
         FbxPose* pose = scene->GetPose(iPose);
         if (!pose->IsBindPose()) continue;
@@ -409,13 +414,13 @@ void GetBoneBindpose(FbxScene* scene) {
             FbxString name = pose->GetNodeName(i).GetCurrentName();
             for (auto iter = g_vecBones.begin(); iter != g_vecBones.end(); iter++) {
                 if (iter->name != name) continue;
-                //iter->globalMatrix = pose->GetMatrix(i);
-
-                //cout << name << "'s BindPose: \n";
-                //PrintFbxMatrix(iter->globalMatrix);
-
                 iter->globalMatrix = FbxMtxConvertToXMFLOAT4X4(pose->GetMatrix(i));
-                PrintMtx(XMLoadFloat4x4(&iter->globalMatrix));
+
+#ifdef REFLECT
+                XMStoreFloat4x4(&iter->globalMatrix, XMMatrixMultiply(XMLoadFloat4x4(&iter->globalMatrix), XMMatrixReflect(XMVectorSet(1, 0, 0, 0))));
+#else
+
+#endif
 
             }
         }
@@ -471,29 +476,17 @@ void GetKeytime(FbxScene* scene) {
 }
 
 bool IsRootBone(Bone bone) { return (bone.parentIdx == -1); }
-//FbxAMatrix GetTransfromEachTime(Bone bone, FbxTime time) {
-//    if (IsRootBone(bone)) {
-//        FbxAMatrix temp = bone.node->EvaluateLocalTransform(time);
-//
-//        //cout << bone.name << "\n";
-//        //PrintFbxAMatrix(temp);
-//
-//        return temp;
-//    }
-//    else {
-//        FbxAMatrix temp = bone.node->EvaluateLocalTransform(time);
-//
-//        //cout << bone.name << "\n";
-//        //PrintFbxAMatrix(temp);
-//
-//        return GetTransfromEachTime(g_vecBones[bone.parentIdx], time) * temp;
-//    }
-//}
 
 XMMATRIX GetTransfromEachTime(Bone bone, FbxTime time) {
     XMMATRIX result;
     XMFLOAT4X4 temp;
 	temp = FbxAMtxConvertToXMFLOAT4X4(bone.node->EvaluateLocalTransform(time));
+#ifdef REFLECT
+    XMStoreFloat4x4(&temp, XMMatrixMultiply(XMLoadFloat4x4(&temp), XMMatrixReflect(XMVectorSet(1, 0, 0, 0))));
+
+#else
+
+#endif
     if (IsRootBone(bone)) 
         return XMLoadFloat4x4(&temp);
     else 
@@ -501,25 +494,8 @@ XMMATRIX GetTransfromEachTime(Bone bone, FbxTime time) {
 }
 
 void GetBoneEachTimeTransfrom() {
-
-    //cout << "\n\nSomething... Mtx\n\n";
-    XMVECTOR p0 = XMVectorSet(0.5, 2, 0.5, 1);
-    //cout << "P0 :" << Eps(XMVectorGetX(p0)) << ", " << Eps(XMVectorGetY(p0)) << ", " << Eps(XMVectorGetZ(p0)) << ", " << Eps(XMVectorGetW(p0)) << "\n\n";
-
     for (int i = 0; i < g_vecBones.size(); i++) {
         for (auto iter = g_setKeytimes.begin(); iter != g_setKeytimes.end(); iter++) {
-
-
-
-
-            //cout << "Bone_" << i + 1 << "_" << (*iter).GetSecondDouble() << "\n";
-            //XMFLOAT4X4 temp = FbxAMtxConvertToXMFLOAT4X4(g_vecBones[i].node->EvaluateLocalTransform(*iter));
-
-            //XMVECTOR det;
-            //det = XMMatrixDeterminant(XMLoadFloat4x4(&g_vecBones[i].p));
-            //PrintMtx(XMMatrixMultiply(XMLoadFloat4x4(&temp), XMMatrixInverse(&det, XMLoadFloat4x4(&g_vecBones[i].p))));
-            //PrintMtx(GetTransfromEachTime(g_vecBones[i], *iter));
-            //PrintMtx( XMMatrixMultiply( XMLoadFloat4x4(&g_vecBones[i].toDressposeInv) , GetTransfromEachTime(g_vecBones[i], *iter) ) );
 
             /*=================================================================
             여기서 toDressposeInv가 front
@@ -536,18 +512,9 @@ void GetBoneEachTimeTransfrom() {
             (상황에 따라서 X축 반전을 해주던가 뭔가 하여간~)
             =================================================================*/
 
-            //XMMatrixMultiply(XMLoadFloat4x4(&g_vecBones[i].toDressposeInv), GetTransfromEachTime(g_vecBones[i], *iter));
-
-            XMVECTOR p = XMVector3Transform(p0, XMMatrixMultiply(XMLoadFloat4x4(&g_vecBones[i].toDressposeInv), GetTransfromEachTime(g_vecBones[i], *iter)));
-            cout << "P :" << Eps(XMVectorGetX(p)) << ", " << Eps(XMVectorGetY(p)) << ", " << Eps(XMVectorGetZ(p)) << ", " << Eps(XMVectorGetW(p)) << "\n\n";
             XMFLOAT4X4 toWorld;
             XMStoreFloat4x4(&toWorld, GetTransfromEachTime(g_vecBones[i], *iter));
             g_vecBones[i].toWorld.push_back(toWorld);
-
-            //g_vecBones[i].transforms.push_back(GetTransfromEachTime(g_vecBones[i], *iter));
-
-
-
         }
     }
 }
@@ -571,44 +538,24 @@ void GetBoneToParentAndToDressposeInvMtx() {
         XMMATRIX result;
         XMVECTOR det;
         
-
-        //if(g_vecBones[i].parentIdx == -1)   result = g_vecBones[i].globalMatrix;
-        //else                                result = g_vecBones[g_vecBones[i].parentIdx].globalMatrix.Inverse() * g_vecBones[i].globalMatrix;
-
-		if (g_vecBones[i].parentIdx == -1)  result = XMLoadFloat4x4(&g_vecBones[i].globalMatrix);
+        if (g_vecBones[i].parentIdx == -1) {
+            result = XMLoadFloat4x4(&g_vecBones[i].globalMatrix);
+        }
         else {
             det = XMMatrixDeterminant(XMLoadFloat4x4(&g_vecBones[g_vecBones[i].parentIdx].globalMatrix));
             result = XMMatrixMultiply(XMLoadFloat4x4(&g_vecBones[i].globalMatrix), XMMatrixInverse(&det, XMLoadFloat4x4(&g_vecBones[g_vecBones[i].parentIdx].globalMatrix))  );
         }
-        //cout << "Bone_" << i << "'s toParent\n";
-        //PrintFbxMatrix(result);
-
-        //g_vecBones[i].toParent = FbxMtxConvertToXMFLOAT4X4(result);
         XMStoreFloat4x4(&g_vecBones[i].toParent, result);
-        PrintMtx(XMLoadFloat4x4(&g_vecBones[i].toParent));
-
         det = XMMatrixDeterminant(GetToDressposeMtx(g_vecBones[i]));
         XMStoreFloat4x4(&g_vecBones[i].toDressposeInv, XMMatrixInverse(&det, GetToDressposeMtx(g_vecBones[i])));
 
-
-        //cout << "Bone_" << i << "'s toDressposeInv\n";
-        //PrintMtx(XMMatrixInverse(&det, GetToDressposeMtx(g_vecBones[i])));
-
-
-
-
+        cout 
+            << "================================================\n"
+            << "BoneIdx: " << i << "\n"
+            << "================================================\n"
+            << "BoneName: " << g_vecBones[i].name << "\n";
     }
 }
-
-
-
-
-
-
-
-
-
-
 
 void GetAnimationData(FbxScene* scene) {
     GetBoneHierarchy(scene->GetRootNode());   // 1. 각 Bone별 구조를 만든다.
@@ -617,11 +564,31 @@ void GetAnimationData(FbxScene* scene) {
     GetKeytime(scene);                        // 3. 각 Bone별 Keytime을 구한다.
     GetBoneEachTimeTransfrom();               // 4. 각 Bone의 Keytime별 Transfrom을 구한다.
 }
+
+void ReflectYZPlane() {
+    for (auto it = g_vecBones.begin(); it != g_vecBones.end(); it++) {
+        //XMStoreFloat4x4(&it->toDressposeInv, XMMatrixMultiply(XMLoadFloat4x4(&it->toDressposeInv), XMMatrixReflect(XMVectorSet(1, 0, 0, 0))));
+        
+        for (auto it2 = it->toWorld.begin(); it2 != it->toWorld.end(); it2++) 
+            XMStoreFloat4x4(&(*it2), XMMatrixMultiply(XMLoadFloat4x4(&(*it2)), XMMatrixReflect(XMVectorSet(1, 0, 0, 0))));
+    }
+}
+void ReflectXYPlane() {
+    for (auto it = g_vecBones.begin(); it != g_vecBones.end(); it++) {
+        //XMStoreFloat4x4(&it->toDressposeInv, XMMatrixMultiply(XMLoadFloat4x4(&it->toDressposeInv), XMMatrixReflect(XMVectorSet(0, 0, 1, 0))));
+
+        for (auto it2 = it->toWorld.begin(); it2 != it->toWorld.end(); it2++)
+            XMStoreFloat4x4(&(*it2), XMMatrixMultiply(XMLoadFloat4x4(&(*it2)), XMMatrixReflect(XMVectorSet(0, 0, 1, 0))));
+    }
+}
+
 void ExportAnimation(const char* fileName) {
     if (g_vecBones.empty()) { cout << "Animation Data not exist.\n"; return; }
 
+
     string ultimateOfPerfectFilePath;
-    string fileHead = "Output/";
+    string fileHead("../../../WindowsProject1/WindowsProject1/Assets/");
+    //string fileHead = "Output/";
     string fileTail = ".mac";   // my Anim Clip
 
     ultimateOfPerfectFilePath = fileHead + fileName;
@@ -652,7 +619,6 @@ void ExportAnimation(const char* fileName) {
 
         int idx = 0;
         GetXMFLOAT4X4(g_vecBones[iBones].toDressposeInv, pDest, idx);
-        //GetGlobalMtx(g_vecBones[iBones].globalMatrix, pDest, idx);
         for (int iKeys = 0; iKeys < nKeys; iKeys++) 
             GetXMFLOAT4X4(g_vecBones[iBones].toWorld[iKeys], pDest, idx);
 
@@ -668,20 +634,35 @@ void main() {
     FbxScene* lScene = NULL;
     bool lResult;
 
-    InitializeSdkObjects(lSdkManager, lScene);
-
-    string fileName("animTest2_YUP");
+    string fileName("Humanoid_Aiming");
     string fileHead("Input/");
     string fileTail(".FBX");
     string filePath;
     filePath = fileHead + fileName;
     filePath += fileTail;
 
+    InitializeSdkObjects(lSdkManager, lScene);
+
     lResult = LoadScene(lSdkManager, lScene, filePath.c_str());
 
+    FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eYAxis, FbxAxisSystem::EFrontVector::eParityOdd, FbxAxisSystem::ECoordSystem::eLeftHanded);   //FbxAxisSystem::eDirectX
+    d3dAxisSystem.DeepConvertScene(lScene);
+
+    //FbxAxisSystem fbxAxisSystem = lScene->GetGlobalSettings().GetAxisSystem();
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::eDirectX);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eXAxis, FbxAxisSystem::EFrontVector::eParityEven, FbxAxisSystem::ECoordSystem::eLeftHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eXAxis, FbxAxisSystem::EFrontVector::eParityOdd, FbxAxisSystem::ECoordSystem::eLeftHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eXAxis, FbxAxisSystem::EFrontVector::eParityEven, FbxAxisSystem::ECoordSystem::eRightHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eXAxis, FbxAxisSystem::EFrontVector::eParityOdd, FbxAxisSystem::ECoordSystem::eRightHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eYAxis, FbxAxisSystem::EFrontVector::eParityEven, FbxAxisSystem::ECoordSystem::eLeftHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eYAxis, FbxAxisSystem::EFrontVector::eParityEven, FbxAxisSystem::ECoordSystem::eRightHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eYAxis, FbxAxisSystem::EFrontVector::eParityOdd, FbxAxisSystem::ECoordSystem::eRightHanded);  ////YZ 전환 temp.m_xmf3Pos.z *= -1; 일 때, 좌우반전
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eZAxis, FbxAxisSystem::EFrontVector::eParityEven, FbxAxisSystem::ECoordSystem::eLeftHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eZAxis, FbxAxisSystem::EFrontVector::eParityOdd, FbxAxisSystem::ECoordSystem::eLeftHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eZAxis, FbxAxisSystem::EFrontVector::eParityEven, FbxAxisSystem::ECoordSystem::eRightHanded);
+    //FbxAxisSystem d3dAxisSystem(FbxAxisSystem::EUpVector::eZAxis, FbxAxisSystem::EFrontVector::eParityOdd, FbxAxisSystem::ECoordSystem::eRightHanded);
+
     GetAnimationData(lScene);
-
-
-    //ExportAnimation(fileName.c_str());
+    ExportAnimation(fileName.c_str());
 }
 

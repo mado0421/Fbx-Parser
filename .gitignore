@@ -27,3 +27,4 @@ Fbx Parser/x64/Debug/main.obj
 Fbx Parser/x64/Debug/vc142.idb
 Fbx Parser/x64/Debug/vc142.pdb
 *.ipch
+*.FBX
